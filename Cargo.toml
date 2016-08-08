@@ -1,0 +1,14 @@
+[package]
+name = "server"
+version = "0.1.0"
+authors = ["Jonathan McElroy <jonathanpmcelroy@gmail.com>"]
+
+[dependencies]
+nickel = "*"
+rustc-serialize = "*"
+rust-ini = "*"
+regex = "*"
+
+[dependencies.hyper]
+version = "*"
+default-features = false
