@@ -8,6 +8,7 @@ extern crate regex;
 use std::io::Read;
 use nickel::{Nickel, HttpRouter, Mountable, StaticFilesHandler};
 use hyper::{Client};
+use hyper::status::StatusCode;
 use rustc_serialize::json;
 use ini::Ini;
 use regex::Regex;
@@ -16,13 +17,15 @@ const HOST: &'static str = "http://192.168.221.80:3000/";
 
 #[derive(RustcDecodable, RustcEncodable)]
 struct ProgressRes {
-    pub contents: String
+    pub contents: String,
+    pub file_references: Vec<String>,
 }
 
 #[derive(Debug)]
 enum Error {
     Hyper(hyper::Error),
-    General(String),
+    Ini(&'static str, ini::ini::Error),
+    General(&'static str),
 }
 
 fn get_file(conn: &Client, path: &str) -> Result<String, Error> {
@@ -32,24 +35,28 @@ fn get_file(conn: &Client, path: &str) -> Result<String, Error> {
     url.push_str(path);
 
     conn.get(&url).send()
-        .map(|mut res| {
-            let _ = res.read_to_string(&mut ret);
-            return ret;
-        })
         .map_err(|err| Error::Hyper(err))
+        .and_then(|mut res| {
+            if res.status == StatusCode::Ok {
+                let _ = res.read_to_string(&mut ret);
+                return Ok(ret);
+            } else {
+                return Err(Error::General("Could not get file"));
+            }
+        })
 
 }
 
-fn get_propath(conn: &Client) -> Vec<String> {
-    let mut stec_ini = get_file(&conn, "stec.ini").unwrap();
+fn get_propath(conn: &Client) -> Result<Vec<String>, Error> {
+    let mut stec_ini = try!(get_file(&conn, "C:/stec82/stec.ini"));
     stec_ini = stec_ini.replace("\\", "/");
 
-    let conf = Ini::load_from_str(&stec_ini).unwrap();
+    let conf = try!(Ini::load_from_str(&stec_ini).map_err(|err| Error::Ini("Could not parse ini file", err)));
 
     conf.section(Some("Startup"))
         .and_then(|section| section.get("PROPATH"))
-        .unwrap()
-        .split(",").map(|s| String::from(s)).collect()
+        .map(|s| s.split(",").map(|s| String::from(s)).collect())
+        .ok_or(Error::General("No PROPATH field"))
 }
 
 fn get_progress_file(conn: &Client, path: &str, propath: &Vec<String>) -> Result<String, Error> {
@@ -57,15 +64,13 @@ fn get_progress_file(conn: &Client, path: &str, propath: &Vec<String>) -> Result
         let mut new_path = each_path.to_owned();
         new_path.push('/');
         new_path.push_str(path);
-        println!("{}", new_path);
 
         let result = get_file(conn, &new_path);
         if result.is_ok() {
-            println!("{:?}", result);
             return result;
         }
     }
-    return Err(Error::General(String::from("Could not find file")));
+    return Err(Error::General("Could not find file"));
 }
 
 fn progress_children<'a>(contents: &'a str) -> Vec<&'a str> {
@@ -75,7 +80,7 @@ fn progress_children<'a>(contents: &'a str) -> Vec<&'a str> {
 
 fn main() {
     let conn = Client::new();
-    let propath = get_propath(&conn);
+    let propath = get_propath(&conn).unwrap();
 
     let mut server = Nickel::new();
 
@@ -89,11 +94,20 @@ fn main() {
     let program_regex = Regex::new(r"/program/(?P<program>[-%~\w/\.]+)$").unwrap();
     server.mount("/api/", router! {
         get program_regex => |req, res| {
-            let contents = get_progress_file(&conn, &req.param("program").unwrap().replace("%2F", "/"), &propath).unwrap();
-            println!("{:?}", contents);
+            let r_contents = get_progress_file(&conn, &req.param("program").unwrap().replace("%2F", "/"), &propath);
+            if r_contents.is_err() {
+                panic!("{:?}", r_contents.err().unwrap());
+            }
+        
+            let contents = r_contents.unwrap();
+
+            let file_references_regex = Regex::new(r"[-\w/\\]+?\.[pwi]").unwrap();
+            let file_references = file_references_regex.find_iter(&contents).map(|(l, r)| String::from(&contents[l..r]).replace("\\", "/")).collect();
+            println!("{:?}", file_references);
 
             let progress_json = ProgressRes {
-                contents: contents
+                contents: contents,
+                file_references: file_references,
             };
 
             return res.send(json::encode(&progress_json).unwrap());

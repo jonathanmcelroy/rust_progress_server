@@ -3,6 +3,8 @@
         var programController = this;
 
         resource("/api/program/" + encodeURIComponent(state.params.name)).get(function(res) {
+            programController.name = state.params.name;
+            programController.fileReferences = res.file_references;
             programController.value = res.contents;
         })
 

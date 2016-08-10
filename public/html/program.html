@@ -1,3 +1,8 @@
-This is the program
+
+<h3> {{ program.name }} </h3>
+
+<ul ng-repeat="fileReference in program.fileReferences track by $index">
+    <li><a ui-sref="program({name: fileReference})">{{ fileReference }}</a></li>
+</ul>
 
 {{ program.value }}
