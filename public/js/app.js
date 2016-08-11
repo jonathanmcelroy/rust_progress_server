@@ -7,12 +7,20 @@
             .state('home', {
                 url: '/home',
                 templateUrl: '/static/html/home.html',
+                controller: 'homeController',
+                controllerAs: 'home',
+            })
+            .state('search', {
+                url: '/search/:contents',
+                templateUrl: '/static/html/search.html',
+                controller: 'searchController',
+                controllerAs: 'search',
             })
             .state('program', {
                 url: '/program/:name',
                 templateUrl: '/static/html/program.html',
                 controller: 'programController',
-                controllerAs: 'program'
+                controllerAs: 'program',
             });
     });
 }());

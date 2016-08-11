@@ -20,6 +20,10 @@ struct ProgressRes {
     pub contents: String,
     pub file_references: Vec<String>,
 }
+#[derive(RustcDecodable, RustcEncodable)]
+struct SearchRes {
+    pub results: Vec<String>
+}
 
 #[derive(Debug)]
 enum Error {
@@ -92,6 +96,7 @@ fn main() {
     });
 
     let program_regex = Regex::new(r"/program/(?P<program>[-%~\w/\.]+)$").unwrap();
+    let search_regex = Regex::new(r"/search/(?P<contents>.+)$").unwrap();
     server.mount("/api/", router! {
         get program_regex => |req, res| {
             let r_contents = get_progress_file(&conn, &req.param("program").unwrap().replace("%2F", "/"), &propath);
@@ -111,6 +116,12 @@ fn main() {
             };
 
             return res.send(json::encode(&progress_json).unwrap());
+        }
+        get search_regex => |req, res| {
+            let search_json = SearchRes {
+                results: vec!(String::from("test"))
+            };
+            return res.send(json::encode(&search_json).unwrap());
         }
     });
 

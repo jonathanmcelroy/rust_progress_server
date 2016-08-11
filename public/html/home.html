@@ -1,2 +1,5 @@
-<a ui-sref="program({name: 'windows/f-newapp.w'})">newapp.w</a>
-<a ui-sref="program({name: 'windows/f-underwrite.w'})">underwrite.w</a>
+<form ng-submit="home.onSearch()" name="search">
+    Search:
+    <input type="text" ng-model="home.searchText" required />
+    <input type="submit" id="submit" value="Submit" />
+</form>
