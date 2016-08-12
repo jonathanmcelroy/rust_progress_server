@@ -1,5 +1,5 @@
 <ul ng-repeat="result in search.results">
     <li>
-     {{ result }}
+        <a ui-sref="program({name: result})"> {{ result }} </a>
     </li>
 </ul>

@@ -5,7 +5,7 @@
         searchController.results = [];
 
         resource('api/search/' + state.params.contents).get(function(res) {
-            console.log(res);
+            searchController.results = res.results;
         });
 
     }]);

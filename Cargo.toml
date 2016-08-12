@@ -8,6 +8,7 @@ nickel = "*"
 rustc-serialize = "*"
 rust-ini = "*"
 regex = "*"
+url = "*"
 
 [dependencies.hyper]
 version = "*"
