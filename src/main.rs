@@ -84,7 +84,6 @@ fn progress_children<'a>(contents: &'a str) -> Vec<&'a str> {
 
 fn main() {
     let conn = Client::new();
-    let propath = get_propath(&conn).unwrap();
 
     let mut server = Nickel::new();
 
