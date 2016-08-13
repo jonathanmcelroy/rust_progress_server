@@ -8,12 +8,14 @@ extern crate url;
 
 use std::io::Read;
 use nickel::{Nickel, HttpRouter, Mountable, StaticFilesHandler};
+use nickel::status::StatusCode as nStatusCode;
 use hyper::Client;
-use hyper::status::StatusCode;
+use hyper::status::StatusCode as hStatusCode;
 use rustc_serialize::json;
-use ini::Ini;
 use regex::Regex;
-use url::Url;
+
+mod error;
+use error::{Error, ProgressResult, unwrap_or_exit};
 
 const HOST: &'static str = "http://192.168.221.80:3000/";
 
@@ -27,48 +29,35 @@ struct SearchRes {
     pub results: Vec<String>
 }
 
-#[derive(Debug)]
-enum Error {
-    Hyper(hyper::Error),
-    Ini(&'static str, ini::ini::Error),
-    General(&'static str),
-}
-
-fn get_progress_file(conn: &Client, path: &str) -> Result<String, Error> {
+fn get_progress_file(conn: &Client, path: &str) -> ProgressResult<String> {
     let mut url = String::from(HOST);
     url.push_str("file/");
     url.push_str(path);
 
-    conn.get(&url).send()
-        .map_err(|err| Error::Hyper(err))
-        .and_then(|mut res| {
-            if res.status == StatusCode::Ok {
-                let mut ret = String::new();
-                let _ = res.read_to_string(&mut ret);
-                return Ok(ret);
-            } else {
-                return Err(Error::General("Could not get file"));
-            }
-        })
+    let mut res = try!(conn.get(&url).send());
+    if res.status == hStatusCode::Ok {
+        let mut ret = String::new();
+        let _ = res.read_to_string(&mut ret);
+        return Ok(ret);
+    } else {
+        return Err(Error::General("Could not get file"));
+    }
 }
 
-fn find_progress_file(conn: &Client, path: &str) -> Result<Vec<String>, Error> {
+fn find_progress_file(conn: &Client, path: &str) -> ProgressResult<Vec<String>> {
     let mut url = String::from(HOST);
     url.push_str("find/");
     url.push_str(path);
     println!("{}", url);
 
-    conn.get(&url).send()
-        .map_err(|err| Error::Hyper(err))
-        .and_then(|mut res| {
-            if res.status == StatusCode::Ok {
-                let mut ret = String::new();
-                let _ = res.read_to_string(&mut ret);
-                return Ok(json::decode(&ret).unwrap());
-            } else {
-                return Err(Error::General("Could not get file"));
-            }
-        })
+    let mut res = try!(conn.get(&url).send());
+    if res.status == hStatusCode::Ok {
+        let mut ret = String::new();
+        let _ = res.read_to_string(&mut ret);
+        return Ok(json::decode(&ret).unwrap());
+    } else {
+        return Err(Error::General("Could not get file"));
+    }
 }
 
 fn progress_children<'a>(contents: &'a str) -> Vec<&'a str> {
