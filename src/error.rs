@@ -4,6 +4,7 @@ use std::fmt::{Display, Formatter};
 use std::io::{Write, stderr};
 use std::process::exit;
 
+use docopt;
 use hyper;
 use ini::ini;
 
@@ -11,6 +12,7 @@ use ini::ini;
 pub enum Error {
     Ini(ini::Error),
     Hyper(hyper::Error),
+    Docopt(docopt::Error),
     General(&'static str),
 }
 
@@ -22,12 +24,16 @@ impl From<ini::Error> for Error {
 impl From<hyper::Error> for Error {
     fn from(err: hyper::Error) -> Error { Error::Hyper(err) }
 }
+impl From<docopt::Error> for Error {
+    fn from(err: docopt::Error) -> Error { Error::Docopt(err) }
+}
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         match self {
             &Error::Ini(ref err) => write!(f, "{}", err),
             &Error::Hyper(ref err) => write!(f, "{}", err),
+            &Error::Docopt(ref err) => write!(f, "{}", err),
             &Error::General(ref s) => write!(f, "Error: {}", s),
         }
     }

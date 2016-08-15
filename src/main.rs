@@ -5,14 +5,18 @@ extern crate rustc_serialize;
 extern crate ini;
 extern crate regex;
 extern crate url;
+extern crate docopt;
 
 use std::io::Read;
+
 use nickel::{Nickel, HttpRouter, Mountable, StaticFilesHandler};
 use nickel::status::StatusCode as nStatusCode;
 use hyper::Client;
 use hyper::status::StatusCode as hStatusCode;
 use rustc_serialize::json;
 use regex::Regex;
+use docopt::Docopt;
+use url::Url;
 
 mod error;
 use error::{Error, ProgressResult, unwrap_or_exit};
@@ -29,12 +33,13 @@ struct SearchRes {
     pub results: Vec<String>
 }
 
-fn get_progress_file(conn: &Client, path: &str) -> ProgressResult<String> {
-    let mut url = String::from(HOST);
-    url.push_str("file/");
-    url.push_str(path);
+fn get_progress_file(conn: &Client, base: &Url, path: &str) -> ProgressResult<String> {
+// fn get_progress_file(conn: &Client, path: &str) -> ProgressResult<String> {
+    let mut url = base.clone();
+    url = url.join("file/").unwrap();
+    url = url.join(path).unwrap();
 
-    let mut res = try!(conn.get(&url).send());
+    let mut res = try!(conn.get(url).send());
     if res.status == hStatusCode::Ok {
         let mut ret = String::new();
         let _ = res.read_to_string(&mut ret);
@@ -44,13 +49,14 @@ fn get_progress_file(conn: &Client, path: &str) -> ProgressResult<String> {
     }
 }
 
-fn find_progress_file(conn: &Client, path: &str) -> ProgressResult<Vec<String>> {
-    let mut url = String::from(HOST);
-    url.push_str("find/");
-    url.push_str(path);
+fn find_progress_file(conn: &Client, base: &Url, path: &str) -> ProgressResult<Vec<String>> {
+// fn find_progress_file(conn: &Client, path: &str) -> ProgressResult<Vec<String>> {
+    let mut url = base.clone();
+    url = url.join("find").unwrap();
+    url = url.join(path).unwrap();
     println!("{}", url);
 
-    let mut res = try!(conn.get(&url).send());
+    let mut res = try!(conn.get(url).send());
     if res.status == hStatusCode::Ok {
         let mut ret = String::new();
         let _ = res.read_to_string(&mut ret);
@@ -65,7 +71,14 @@ fn progress_children<'a>(contents: &'a str) -> Vec<&'a str> {
     re.find_iter(contents).map(|(start, end)| &contents[start..end]).collect()
 }
 
+const USAGE: &'static str = "
+Usage: main <ip> <file-server-url>
+";
+
 fn main() {
+    let args = unwrap_or_exit(Docopt::new(USAGE).unwrap().parse());
+    let file_server_url = Url::parse(args.get_str("<file-server-url>")).unwrap();
+
     let mut server = Nickel::new();
 
     server.utilize(middleware! {
@@ -75,40 +88,40 @@ fn main() {
         }
     });
 
-    let program_regex = Regex::new(r"/program/(?P<program>[-%~\w/\.]+)$").unwrap();
-    let search_regex = Regex::new(r"/search/(?P<contents>.+)$").unwrap();
-    server.mount("/api/", router! {
-        get program_regex => |req, res| {
-            let conn = Client::new();
-            let r_contents = get_progress_file(&conn, &req.param("program").unwrap());
-            let contents = match r_contents {
-                Ok(contents) => contents,
-                Err(err) => panic!("{:?}", err)
-            };
+    let program_regex = Regex::new(r"/api/program/(?P<program>[-%~\w/\.]+)$").unwrap();
+    server.get(program_regex, |req, res| {
+        let conn = Client::new();
+        let r_contents = get_progress_file(&conn, &file_server_url, &req.param("program").unwrap());
+        let contents = match r_contents {
+            Ok(contents) => contents,
+            Err(err) => panic!("{:?}", err)
+        };
 
-            let file_references_regex = Regex::new(r"[-\w/\\]+?\.[pwi]").unwrap();
-            let file_references = file_references_regex.find_iter(&contents).map(|(l, r)| String::from(&contents[l..r]).replace("\\", "/")).collect();
+        let file_references_regex = Regex::new(r"[-\w/\\]+?\.[pwi]").unwrap();
+        let file_references = file_references_regex.find_iter(&contents).map(|(l, r)| String::from(&contents[l..r]).replace("\\", "/")).collect();
 
-            let progress_json = ProgressRes {
-                contents: contents,
-                file_references: file_references,
-            };
+        let progress_json = ProgressRes {
+            contents: contents,
+            file_references: file_references,
+        };
 
-            return res.send(json::encode(&progress_json).unwrap());
-        }
-        get search_regex => |req, res| {
-            let conn = Client::new();
-            let find_results = find_progress_file(&conn, &req.param("contents").unwrap()).unwrap();
-            let search_json = SearchRes {
-                results: find_results
-            };
-            return res.send(json::encode(&search_json).unwrap());
-        }
+        return res.send(json::encode(&progress_json).unwrap());
+    });
+
+    let search_regex = Regex::new(r"/api/search/(?P<contents>.+)$").unwrap();
+    server.get(search_regex, |req, res| {
+        let conn = Client::new();
+        let find_results = find_progress_file(&conn, &file_server_url, &req.param("contents").unwrap()).unwrap();
+        let search_json = SearchRes {
+            results: find_results
+        };
+        return res.send(json::encode(&search_json).unwrap());
     });
 
     server.mount("/static/", StaticFilesHandler::new("public/"));
 
     server.get("/", StaticFilesHandler::new("public/html/"));
 
-    server.listen("192.168.221.83:3000");
+    let ip = args.get_str("<ip>");
+    server.listen(ip);
 }

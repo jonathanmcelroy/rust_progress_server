@@ -1,5 +1,5 @@
 [package]
-name = "server"
+name = "progress_server"
 version = "0.1.0"
 authors = ["Jonathan McElroy <jonathanpmcelroy@gmail.com>"]
 
@@ -9,6 +9,7 @@ rustc-serialize = "*"
 rust-ini = "*"
 regex = "*"
 url = "*"
+docopt = "*"
 
 [dependencies.hyper]
 version = "*"
