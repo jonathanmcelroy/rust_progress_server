@@ -7,12 +7,14 @@ use std::process::exit;
 use docopt;
 use hyper;
 use ini::ini;
+use url;
 
 #[derive(Debug)]
 pub enum Error {
     Ini(ini::Error),
     Hyper(hyper::Error),
     Docopt(docopt::Error),
+    Url(url::ParseError),
     General(&'static str),
 }
 
@@ -27,6 +29,9 @@ impl From<hyper::Error> for Error {
 impl From<docopt::Error> for Error {
     fn from(err: docopt::Error) -> Error { Error::Docopt(err) }
 }
+impl From<url::ParseError> for Error {
+    fn from(err: url::ParseError) -> Error { Error::Url(err) }
+}
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -34,6 +39,7 @@ impl Display for Error {
             &Error::Ini(ref err) => write!(f, "{}", err),
             &Error::Hyper(ref err) => write!(f, "{}", err),
             &Error::Docopt(ref err) => write!(f, "{}", err),
+            &Error::Url(ref err) => write!(f, "{}", err),
             &Error::General(ref s) => write!(f, "Error: {}", s),
         }
     }

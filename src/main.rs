@@ -1,4 +1,6 @@
 #[macro_use]
+extern crate nom;
+#[macro_use]
 extern crate nickel;
 extern crate hyper;
 extern crate rustc_serialize;
@@ -19,6 +21,7 @@ use docopt::Docopt;
 use url::Url;
 
 mod error;
+mod parser;
 use error::{Error, ProgressResult, unwrap_or_exit};
 
 const HOST: &'static str = "http://192.168.221.80:3000/";
@@ -52,9 +55,11 @@ fn get_progress_file(conn: &Client, base: &Url, path: &str) -> ProgressResult<St
 fn find_progress_file(conn: &Client, base: &Url, path: &str) -> ProgressResult<Vec<String>> {
 // fn find_progress_file(conn: &Client, path: &str) -> ProgressResult<Vec<String>> {
     let mut url = base.clone();
-    url = url.join("find").unwrap();
+    println!("Before: {}", url);
+    url = url.join("find/").unwrap();
+    println!("Middle: {}", url);
     url = url.join(path).unwrap();
-    println!("{}", url);
+    println!("After: {}", url);
 
     let mut res = try!(conn.get(url).send());
     if res.status == hStatusCode::Ok {
@@ -77,7 +82,7 @@ Usage: main <ip> <file-server-url>
 
 fn main() {
     let args = unwrap_or_exit(Docopt::new(USAGE).unwrap().parse());
-    let file_server_url = Url::parse(args.get_str("<file-server-url>")).unwrap();
+    let file_server_url = unwrap_or_exit(Url::parse(args.get_str("<file-server-url>")));
 
     let mut server = Nickel::new();
 
@@ -89,9 +94,10 @@ fn main() {
     });
 
     let program_regex = Regex::new(r"/api/program/(?P<program>[-%~\w/\.]+)$").unwrap();
-    server.get(program_regex, |req, res| {
+    let get_program_file_server_url = file_server_url.clone();
+    server.get(program_regex,  middleware! { |req, res| {
         let conn = Client::new();
-        let r_contents = get_progress_file(&conn, &file_server_url, &req.param("program").unwrap());
+        let r_contents = get_progress_file(&conn, &get_program_file_server_url, &req.param("program").unwrap());
         let contents = match r_contents {
             Ok(contents) => contents,
             Err(err) => panic!("{:?}", err)
@@ -106,17 +112,17 @@ fn main() {
         };
 
         return res.send(json::encode(&progress_json).unwrap());
-    });
+    }});
 
     let search_regex = Regex::new(r"/api/search/(?P<contents>.+)$").unwrap();
-    server.get(search_regex, |req, res| {
+    server.get(search_regex, middleware! { |req, res| {
         let conn = Client::new();
         let find_results = find_progress_file(&conn, &file_server_url, &req.param("contents").unwrap()).unwrap();
         let search_json = SearchRes {
             results: find_results
         };
         return res.send(json::encode(&search_json).unwrap());
-    });
+    }});
 
     server.mount("/static/", StaticFilesHandler::new("public/"));
 

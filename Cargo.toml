@@ -10,6 +10,7 @@ rust-ini = "*"
 regex = "*"
 url = "*"
 docopt = "*"
+nom = "*"
 
 [dependencies.hyper]
 version = "*"
