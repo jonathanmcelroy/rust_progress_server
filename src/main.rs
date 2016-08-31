@@ -23,6 +23,7 @@ use url::Url;
 mod error;
 mod parser;
 use error::{Error, ProgressResult, unwrap_or_exit};
+use parser::{Statement, parse};
 
 const HOST: &'static str = "http://192.168.221.80:3000/";
 
@@ -102,6 +103,12 @@ fn main() {
             Ok(contents) => contents,
             Err(err) => panic!("{:?}", err)
         };
+
+        {
+            let parsedContents = parse(&contents).unwrap();
+            println!("{:?}", parsedContents);
+            // let Progress::String(contents) = parsedContents;
+        }
 
         let file_references_regex = Regex::new(r"[-\w/\\]+?\.[pwi]").unwrap();
         let file_references = file_references_regex.find_iter(&contents).map(|(l, r)| String::from(&contents[l..r]).replace("\\", "/")).collect();
