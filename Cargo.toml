@@ -4,13 +4,21 @@ version = "0.1.0"
 authors = ["Jonathan McElroy <jonathanpmcelroy@gmail.com>"]
 
 [dependencies]
-nickel = "*"
-rustc-serialize = "*"
+rocket = "*"
+rocket_codegen = "*"
+serde = "*"
+serde_json = "*"
+serde_derive = "*"
 rust-ini = "*"
 regex = "*"
 url = "*"
 docopt = "*"
 nom = "*"
+
+[dependencies.rocket_contrib]
+version = "*"
+default-features = false
+features = ["json"]
 
 [dependencies.hyper]
 version = "*"

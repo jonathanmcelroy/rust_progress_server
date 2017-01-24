@@ -1,8 +1,4 @@
-use nom::{IResult, digit};
-use nom::IResult::*;
-
-use std::str;
-use std::vec;
+use nom;
 
 mod preprocessor;
 use self::preprocessor::{PreprocessedProgress, preprocessed_progress};

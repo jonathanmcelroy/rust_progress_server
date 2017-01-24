@@ -1,8 +1,4 @@
-use nom::{IResult, digit};
-use nom::IResult::*;
-
-use std::str;
-use std::vec;
+use nom;
 
 #[derive(Debug)]
 pub enum PreprocessedProgress {
@@ -13,60 +9,55 @@ pub enum PreprocessedProgress {
     Comment(String),
 }
 
-named!(preprocessor_line<PreprocessedProgress>,
-    chain!(
-        char!('&') ~
-        b: take_until_and_consume!("\n"),
-        || {PreprocessedProgress::PreprocessorLine(String::from_utf8_lossy(b).into_owned())}
-    )
-);
+named!(preprocessor_line<&[u8], PreprocessedProgress>,
+       do_parse!(
+           char!('&') >> 
+           line: take_until!("\n") >>
+           (PreprocessedProgress::PreprocessorLine(String::from_utf8_lossy(line).into_owned()))
+           )
+      );
 
-named!(preprocessor_import<PreprocessedProgress>,
-    map!(
-        delimited!(
-            char!('{'),
-            take_until!("}"),
-            char!('}')
-        ),
-        |b| PreprocessedProgress::Import(String::from_utf8_lossy(b).into_owned())
-    )
-);
+named!(preprocessor_import<&[u8], PreprocessedProgress>,
+       do_parse!(
+           char!('{') >>
+           import: take_until!("}") >>
+           char!('}') >>
+           (PreprocessedProgress::Import(String::from_utf8_lossy(import).into_owned()))
+           )
+      );
 
-named!(preprocessor_replace<PreprocessedProgress>,
-    map!(
-        delimited!(
-            char!('{'),
-            digit,
-            char!('}')
-        ),
-        |b| PreprocessedProgress::Replace(String::from_utf8_lossy(b).into_owned())
-    )
-);
+named!(preprocessor_replace<&[u8], PreprocessedProgress>,
+       do_parse!(
+           char!('{') >>
+           d: digit >>
+           char!('}') >>
+           (PreprocessedProgress::Replace(String::from_utf8_lossy(d).into_owned()))
+           )
+      );
 
-named!(comment<PreprocessedProgress>,
-    map!(
-        delimited!(
-            tag!("/*"),
-            many0!(
-                alt!(
-                    comment |
-                    anychar
-                )
-            )
-            tag!("*/")
-        ),
-        |b| PreprocessedProgress::Comment(String::from_utf8_lossy(b).into_owned())
-    )
-);
+/*
+// named!(comment<&[u8], PreprocessedProgress>,
+// do_parse!(
+// tag!("/*") >>
+// contents: many0!(
+// alt!(
+// comment |
+// )
+// ) >>
+// tag!("*/") >>
+// (PreprocessedProgress::Comment(String::from_utf8_lossy(contents).into_owned()))
+// )
+// );
+*/
 
-named!(pub preprocessed_progress<Vec<PreprocessedProgress> >,
-    many1!(
-        alt!(
-            preprocessor_line |
-            preprocessor_replace |
-            preprocessor_import |
-            map!(take_until_either!("{&"), |b| PreprocessedProgress::Code(String::from_utf8_lossy(b).into_owned()))
-        )
-    )
-);
+named!(pub preprocessed_progress<&[u8], Vec<PreprocessedProgress> >,
+       many1!(
+           alt!(
+               preprocessor_line |
+               preprocessor_replace |
+               preprocessor_import |
+               map!(take_until_either!("{&"), |b| PreprocessedProgress::Code(String::from_utf8_lossy(b).into_owned()))
+               )
+           )
+      );
 
