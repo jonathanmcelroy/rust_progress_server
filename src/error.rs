@@ -10,6 +10,7 @@ use hyper;
 use ini::ini;
 use serde_json;
 use url;
+use nom;
 
 #[derive(Debug)]
 pub enum Error {
@@ -19,6 +20,7 @@ pub enum Error {
     Docopt(docopt::Error),
     JSON(serde_json::Error),
     Url(url::ParseError),
+    Nom(nom::IError),
     General(&'static str),
 }
 
@@ -42,6 +44,9 @@ impl From<serde_json::Error> for Error {
 impl From<url::ParseError> for Error {
     fn from(err: url::ParseError) -> Error { Error::Url(err) }
 }
+impl From<nom::IError> for Error {
+    fn from(err: nom::IError) -> Error { Error::Nom(err) }
+}
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -52,6 +57,7 @@ impl Display for Error {
             &Error::Docopt(ref err) => write!(f, "{}", err),
             &Error::JSON(ref err) => write!(f, "{}", err),
             &Error::Url(ref err) => write!(f, "{}", err),
+            &Error::Nom(ref err) => write!(f, "{:?}", err),
             &Error::General(ref s) => write!(f, "Error: {}", s),
         }
     }
