@@ -1,12 +1,12 @@
 (function() {
-    angular.module('progressServer').controller('searchController', ['$state', '$resource', function(state, resource) {
-        var searchController = this;
+  angular.module('progressServer').controller('searchController', ['$state', '$resource', function(state, resource) {
+    var searchController = this;
 
-        searchController.results = [];
+    searchController.results = [];
 
-        resource('api/search/' + state.params.contents).get(function(res) {
-            searchController.results = res.results;
-        });
+    resource('api/search/procedure/' + state.params.contents).get(function(res) {
+      searchController.results = res.results;
+    });
 
-    }]);
+  }]);
 }());
