@@ -1,7 +1,8 @@
 use parser::util::{identifier, till_eol, wspace};
 use util::u8_ref_to_string;
+use parser::file_position::{FilePositionM, wrap};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AnalysisSuspendHeader {
     VersionNumber,
     PreprocessorBlock,
@@ -11,8 +12,9 @@ pub enum AnalysisSuspendHeader {
     Other { block_type: String }
 }
 
-#[derive(Debug)]
-#[derive(Serialize, Deserialize)]
+type AnalysisSuspendHeaderFP = FilePositionM<AnalysisSuspendHeader>;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum CodeBlockType {
     Custom { name: String, frame_name: String },
     FunctionForward { name: String, frame_name: String },
@@ -22,6 +24,8 @@ pub enum CodeBlockType {
     Unknown { name: String },
 }
 
+type CodeBlockTypeFP = FilePositionM<CodeBlockType>;
+
 named!(custom_code_block<&[u8], CodeBlockType>,
        do_parse!(
            tag_no_case!("_CUSTOM") >>
@@ -30,9 +34,13 @@ named!(custom_code_block<&[u8], CodeBlockType>,
            wspace >>
            frame_name: identifier >>
            till_eol >>
-           (CodeBlockType::Custom { name: u8_ref_to_string(name), frame_name: u8_ref_to_string(frame_name) })
+           (CodeBlockType::Custom {
+               name: u8_ref_to_string(name),
+               frame_name: u8_ref_to_string(frame_name) 
+           })
            )
       );
+
 named!(function_forward<&[u8], CodeBlockType>,
        do_parse!(
            tag_no_case!("_FUNCTION-FORWARD") >>
@@ -41,7 +49,10 @@ named!(function_forward<&[u8], CodeBlockType>,
            wspace >>
            frame_name: identifier >>
            till_eol >>
-           (CodeBlockType::FunctionForward { name: u8_ref_to_string(name), frame_name: u8_ref_to_string(frame_name) })
+           (CodeBlockType::FunctionForward {
+               name: u8_ref_to_string(name),
+               frame_name: u8_ref_to_string(frame_name)
+           })
            )
       );
 named!(control_code_block<&[u8], CodeBlockType>,
@@ -52,7 +63,10 @@ named!(control_code_block<&[u8], CodeBlockType>,
            wspace >>
            frame_name: identifier >>
            till_eol >>
-           (CodeBlockType::Control { name: u8_ref_to_string(name), frame_name: u8_ref_to_string(frame_name) })
+           (CodeBlockType::Control {
+               name: u8_ref_to_string(name),
+               frame_name: u8_ref_to_string(frame_name)
+           })
            )
       );
 named!(procedure<&[u8], CodeBlockType>,
@@ -63,7 +77,10 @@ named!(procedure<&[u8], CodeBlockType>,
            wspace >>
            frame_name: identifier >>
            till_eol >>
-           (CodeBlockType::Procedure { name: u8_ref_to_string(name), frame_name: u8_ref_to_string(frame_name) })
+           (CodeBlockType::Procedure {
+               name: u8_ref_to_string(name),
+               frame_name: u8_ref_to_string(frame_name)
+           })
            )
       );
 named!(function<&[u8], CodeBlockType>,
@@ -74,14 +91,19 @@ named!(function<&[u8], CodeBlockType>,
            wspace >>
            frame_name: identifier >>
            till_eol >>
-           (CodeBlockType::Function { name: u8_ref_to_string(name), frame_name: u8_ref_to_string(frame_name) })
+           (CodeBlockType::Function {
+               name: u8_ref_to_string(name),
+               frame_name: u8_ref_to_string(frame_name)
+           })
            )
       );
 named!(unknown_code_block<&[u8], CodeBlockType>,
        do_parse!(
            name: identifier >>
            till_eol >>
-           (CodeBlockType::Unknown { name: u8_ref_to_string(name) })
+           (CodeBlockType::Unknown {
+               name: u8_ref_to_string(name)
+           })
            )
       );
 

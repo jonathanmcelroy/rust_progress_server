@@ -1,10 +1,13 @@
 mod analysis_suspend;
 
 use nom;
+use combine::{value};
+use combine::combinator::{Value};
+use combine::primitives::{Stream};
 use self::analysis_suspend::{AnalysisSuspendHeader, CodeBlockType, analyze_suspend, analyze_resume};
 use error::{ProgressResult, Error};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PreprocessorASTNode {
     AnalysisSuspend(AnalysisSuspendHeader),
     AnalysisResume,
@@ -161,3 +164,7 @@ named!(pub preprocessed_progress<&[u8], Vec<PreprocessorASTNode> >,
            )
       );
 
+pub fn preprocessed_progress2<I>() -> Value<I, Vec<PreprocessorASTNode>>
+    where I: Stream {
+        return value(vec![]);
+    }

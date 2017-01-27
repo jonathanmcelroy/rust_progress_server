@@ -1,8 +1,16 @@
 
 mod preprocessor;
 mod util;
+mod file_position;
 
-pub use self::preprocessor::{PreprocessorASTNode, PreprocessorAnalysisSection, preprocessed_progress};
+pub use self::preprocessor::{
+    PreprocessorASTNode,
+    PreprocessorAnalysisSection,
+    preprocessed_progress,
+
+    preprocessed_progress2,
+};
+pub use self::file_position::{FilePosition};
 
 /*
 #[derive(Debug)]

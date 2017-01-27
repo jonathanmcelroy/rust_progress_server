@@ -1,4 +1,7 @@
 use nom;
+use combine;
+
+type Parser<O> = combine::Parser<Input: &[u8], Output: O>;
 
 named!(pub till_eol<&[u8], Vec<char>>,
        do_parse!(
@@ -12,5 +15,4 @@ named!(pub wspace, call!(nom::space));
 fn is_identifier_character(ch: u8) -> bool {
     nom::is_alphanumeric(ch) || ch == b'-' || ch == b'_'
 }
-#[allow(dead_code)]
 named!(pub identifier, take_while1!(is_identifier_character));

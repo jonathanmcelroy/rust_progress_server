@@ -13,7 +13,14 @@ This will give the contents of the given procedure
 /procedure/<procedure>/<innerProcedure>
 -----------------
 
-This will give the contents of the given inner procedure
+This will find the definition of the given inner procedure in the given procedure.
+
+{
+  position: FilePosition,
+  procedure: String,
+  contents: String,
+  arguments: Vec<ProgressArguments>
+}
 
 /search/procedure/<procedure>
 ------------------
@@ -27,6 +34,7 @@ This will find a program based upon the filename given
 /search/procedure/<procedure>/<innerProcedure>
 ------------------
 
+TODO: make this more like a search
 This will find the definition of the given inner procedure in the given procedure.
 
 {
