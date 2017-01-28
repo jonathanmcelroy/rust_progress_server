@@ -5,7 +5,7 @@ use serde_json::from_str;
 use std::io::Read;
 use url::Url;
 
-use error::{ProgressResult, Error};
+use error::{ProgressResult, Error, add_message};
 
 pub fn get_procedure_contents(procedure: &str) -> ProgressResult<Vec<u8>> {
     let conn = Client::new();
@@ -21,17 +21,17 @@ pub fn find_procedure(procedure: &str) -> ProgressResult<Vec<String>> {
 
 
 fn get_file_server_address_from_config() -> ProgressResult<Url> {
-    let config = active().ok_or(Error::General("No config file"))?;
+    let config = active().ok_or(Error::new("No config file"))?;
     for (key, value) in config.extras() {
         if key == "file_server_address" {
             if let &Value::String(ref file_server_address) = value {
-                return Ok(Url::parse(file_server_address)?);
+                return Url::parse(file_server_address).map_err(add_message(format!("file_server_address: '{}' in Rocket.tml is not a valid address", file_server_address)));
             } else {
-                return Err(Error::General("stec_root not a string in config file"));
+                return Err(Error::new("stec_root not a string in config file"));
             }
         }
     }
-    return Err(Error::General("No stec_root in config file"));
+    return Err(Error::new("No stec_root in config file"));
 
 }
 
@@ -47,7 +47,7 @@ fn get_progress_file(conn: &Client, base: &Url, path: &str) -> ProgressResult<Ve
         let _ = res.read_to_end(&mut ret);
         return Ok(ret);
     } else {
-        return Err(Error::General("Could not get file"));
+        return Err(Error::new(format!("'{}' does not exist on the file server", path)));
     }
 }
 
@@ -63,6 +63,6 @@ fn find_progress_file(conn: &Client, base: &Url, path: &str) -> ProgressResult<V
         let _ = res.read_to_string(&mut ret);
         return Ok(from_str(&ret)?);
     } else {
-        return Err(Error::General("Could not get file"));
+        return Err(Error::new("Could not get file"));
     }
 }

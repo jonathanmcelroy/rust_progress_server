@@ -63,7 +63,7 @@ impl PreprocessorAnalysisSection {
             match node {
                 PreprocessorASTNode::AnalysisSuspend(header) => {
                     section_start = match section_start {
-                        Some(_) => return Err(Error::General("Two 'analysis-suspend's in a row")),
+                        Some(_) => return Err(Error::new("Two 'analysis-suspend's in a row")),
                         None => Some(header)
                     };
                     if contents.trim().len() > 0 {
@@ -77,7 +77,7 @@ impl PreprocessorAnalysisSection {
                             result.push(PreprocessorAnalysisSection::new(start, contents));
                             None
                         },
-                        None => return Err(Error::General("A 'analysis-result' without an 'analysis-suspend'"))
+                        None => return Err(Error::new("A 'analysis-result' without an 'analysis-suspend'"))
                     };
                     contents = String::new();
                 }

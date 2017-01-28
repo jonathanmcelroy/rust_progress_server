@@ -1,6 +1,7 @@
 #![feature(custom_derive)]
 #![feature(plugin)]
 #![feature(field_init_shorthand)]
+#![feature(conservative_impl_trait)]
 #![plugin(rocket_codegen)]
 #![allow(dead_code)]
 

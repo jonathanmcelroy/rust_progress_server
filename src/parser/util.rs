@@ -1,7 +1,7 @@
 use nom;
 use combine;
 
-type Parser<O> = combine::Parser<Input: &[u8], Output: O>;
+// type Parser<O> = combine::Parser<Input: &[u8], Output: O>;
 
 named!(pub till_eol<&[u8], Vec<char>>,
        do_parse!(
