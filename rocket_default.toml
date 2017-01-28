@@ -1,0 +1,6 @@
+[development]
+address = "*"
+port = 8000
+log = "normal"
+
+file_server_address = "http://localhost:3000"
