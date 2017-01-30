@@ -1,9 +1,9 @@
 mod analysis_suspend;
 
 use nom;
-use combine::{value};
+use combine::{choice, many1, value};
 use combine::combinator::{Value};
-use combine::primitives::{Stream};
+use combine::primitives::{Parser, Stream};
 use self::analysis_suspend::{AnalysisSuspendHeader, CodeBlockType, analyze_suspend, analyze_resume};
 use error::{ProgressResult, Error};
 
@@ -136,19 +136,19 @@ named!(code<&[u8], PreprocessorASTNode>, map!(take_until_either!("{&"), |b| Prep
 /*
 // TODO: add this back
 named!(pub comment<&[u8], PreprocessorASTNode>,
-       do_parse!(
-           tag!("/*") >>
-           contents: many0!(
-               alt_complete!(
-                   comment |
-                   call!(nom::anychar)
-                   )
-               ) >>
-           tag!("*/") >>
-           (PreprocessorASTNode::Comment(String::from_utf8_lossy(contents).into_owned()))
-           )
-      );
-      */
+do_parse!(
+tag!("/*") >>
+contents: many0!(
+alt_complete!(
+comment |
+call!(nom::anychar)
+)
+) >>
+tag!("*/") >>
+(PreprocessorASTNode::Comment(String::from_utf8_lossy(contents).into_owned()))
+)
+);
+*/
 
 named!(pub preprocessed_progress<&[u8], Vec<PreprocessorASTNode> >,
        many1!(
@@ -164,7 +164,12 @@ named!(pub preprocessed_progress<&[u8], Vec<PreprocessorASTNode> >,
            )
       );
 
-pub fn preprocessed_progress2<I>() -> Value<I, Vec<PreprocessorASTNode>>
-    where I: Stream {
-        return value(vec![]);
-    }
+pub fn preprocessed_progress2<I: Stream>() -> impl Parser<Input=I, Output=Vec<PreprocessorASTNode>> {
+    // TODO: complete
+    //return many1(
+        //choice(
+            //analyze_suspend,
+              //)
+        //);
+    return value(vec![]);
+}
