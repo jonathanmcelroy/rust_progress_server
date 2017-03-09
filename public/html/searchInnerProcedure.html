@@ -1,0 +1,8 @@
+<div ng-if="search.results.length == 0">
+  No procedures with title "{{search.fileName}}" and inner procedure "{{search.innerName}}"
+</div>
+<ul ng-repeat="result in search.results track by $index">
+    <li>
+      <a ui-sref="program({name: result.procedure})"><span style='font-weight:bold'>{{ result.procedure }}</span>: {{ result.innerProcedure }} </a>
+    </li>
+</ul>

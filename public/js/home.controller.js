@@ -1,10 +1,19 @@
 (function() {
     angular.module('progressServer').controller('homeController', ['$state', function(state) {
         var homeController = this;
-        homeController.searchText = "";
+        homeController.searchProcedureText = "";
 
-        homeController.onSearch = function() {
-            state.go('search', {'contents': homeController.searchText});
+        homeController.innerSearchProcedureText = "";
+        homeController.innerSearchInnerProcedureText = "";
+
+        homeController.onSearchProcedure = function() {
+            state.go('searchProcedure', {'contents': homeController.searchProcedureText });
+        }
+        homeController.onSearchInnerProcedure = function() {
+            state.go('searchInnerProcedure', {
+              'fileName': homeController.innerSearchProcedureText,
+              'innerName': homeController.innerSearchInnerProcedureText,
+            });
         }
 
     }]);

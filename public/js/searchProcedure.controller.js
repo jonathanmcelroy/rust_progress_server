@@ -1,5 +1,5 @@
 (function() {
-  angular.module('progressServer').controller('searchController', ['$state', '$resource', function(state, resource) {
+  angular.module('progressServer').controller('searchProcedureController', ['$state', '$resource', function(state, resource) {
     var searchController = this;
 
     searchController.search = state.params.contents;

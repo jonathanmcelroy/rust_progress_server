@@ -5,10 +5,14 @@ use combine::{choice, many1, satisfy, try, value};
 use combine::combinator::{Value};
 use combine::primitives::{Parser, Stream};
 use combine::char::{char, digit};
-use self::analysis_suspend::{AnalysisSuspendHeader, CodeBlockType, analyze_suspend, analyze_resume};
 use util::{restrict_string};
 use parser::util::{till_eol};
 use error::{ProgressResult, Error};
+
+use self::analysis_suspend::{AnalysisSuspendHeader, analyze_suspend, analyze_resume};
+pub use self::analysis_suspend::{
+    CodeBlockType
+};
 
 #[derive(Clone)]
 pub enum PreprocessorASTNode {
@@ -50,6 +54,7 @@ impl PreprocessorASTNode {
 }
 
 #[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum PreprocessorAnalysisSection {
     NotInSection {contents: String },
     VersionNumber,
@@ -79,7 +84,7 @@ impl PreprocessorAnalysisSection {
         let mut section_start = None;
         let mut contents = String::new();
         for node in nodes {
-            println!("{}: {:?}", line_number, node);
+            // println!("{}: {:?}", line_number, node);
             match node {
                 PreprocessorASTNode::AnalysisSuspend(header) => {
                     section_start = match section_start {

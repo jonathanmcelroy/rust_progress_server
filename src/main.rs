@@ -32,13 +32,14 @@ mod util;
 mod file_server_api;
 
 use error::{Error, ProgressResult, from};
-use parser::{PreprocessorAnalysisSection, preprocessed_progress, FilePosition};
+use parser::{PreprocessorAnalysisSection, CodeBlockType, preprocessed_progress, FilePosition};
 use util::u8_ref_to_string;
 use file_server_api::{get_procedure_contents, find_procedure};
 
 #[derive(Serialize, Deserialize)]
 struct ProcedureRes {
-    pub contents: String,
+    pub sections: Vec<PreprocessorAnalysisSection>,
+    // pub contents: String,
     pub file_references: Vec<String>,
 }
 #[derive(Serialize, Deserialize)]
@@ -49,8 +50,12 @@ struct InnerProcedureRes {
     //pub arguments: Vec<ProgressArguments>,
 }
 #[derive(Serialize, Deserialize)]
-struct SearchRes {
+struct ProcedureSearchRes {
     pub results: Vec<String>
+}
+#[derive(Serialize, Deserialize)]
+struct InnerProcedureSearchRes {
+    pub results: Vec<(String, String)>
 }
 #[derive(Serialize, Deserialize)]
 struct AnalysisSectionsRes {
@@ -78,38 +83,48 @@ fn static_html_index() -> ProgressResult<NamedFile> {
 #[get("/procedure/<procedure>")]
 fn get_procedure_route(procedure: String) -> ProgressResult<JSON<ProcedureRes>> {
     let file_contents = get_procedure_contents(&procedure)?;
+    let file_contents_str: &str = &u8_ref_to_string(&file_contents);
+    let parse = from(preprocessed_progress().parse_stream(file_contents_str))?;
+    let sections = PreprocessorAnalysisSection::from(parse)?;
 
     //let file_references_regex = Regex::new(r"[-\w/\\]+?\.[pwi]").unwrap();
     //let file_references = file_references_regex.find_iter(&file_contents).map(|each_match| String::from(each_match.as_str()).replace("\\", "/")).collect();
     Ok(JSON(ProcedureRes {
-        contents: u8_ref_to_string(&file_contents),
+        sections,
         file_references: vec![]
     }))
 }
 
 #[get("/search/procedure/<procedure>/<inner_procedure>")]
-fn find_inner_procedure_route(procedure: String, inner_procedure: String) -> ProgressResult<String> {
-    /*
-    let file_contents = get_procedure_contents(procedure)?;
-    let parse = preprocessed_progress(&file_contents).to_full_result()?;
-    let sections = PreprocessorAnalysisSection::from(parse)?;
-    for section in sections {
-        if let PreprocessorAnalysisSection::CodeBlockType {block_type, contents} = section {
-            if block_type == CodeBlockType::Procedure {
-                return Ok(JSON(
+fn find_inner_procedure_route(procedure: String, inner_procedure: String) -> ProgressResult<JSON<InnerProcedureSearchRes>> {
+    let find_procedures = find_procedure(&procedure)?;
+    let mut results = Vec::new();
+    for each_procedure in find_procedures {
+        let file_contents = get_procedure_contents(&each_procedure)?;
+        let file_contents_str: &str = &u8_ref_to_string(&file_contents);
+        let parse = from(preprocessed_progress().parse_stream(file_contents_str))?;
+        let sections = PreprocessorAnalysisSection::from(parse)?;
+        for section in sections {
+            if let PreprocessorAnalysisSection::CodeBlock { block_type, contents } = section {
+                if let CodeBlockType::Procedure { name, frame_name } = block_type {
+                    if name.contains(&inner_procedure) {
+                        println!("{}", name);
+                        results.push((each_procedure.clone(), name))
+                    }
+                }
             }
         }
     }
-    */
-
-    Ok("Ok".to_string())
+    Ok(JSON(InnerProcedureSearchRes {
+        results
+    }))
 }
 
 // Find a procedure based upon the search query
 #[get("/search/procedure/<procedure>", rank = 2)]
-fn find_procedure_route(procedure: &str) -> ProgressResult<JSON<SearchRes>> {
+fn find_procedure_route(procedure: &str) -> ProgressResult<JSON<ProcedureSearchRes>> {
     let find_results = find_procedure(procedure)?;
-    Ok(JSON(SearchRes {
+    Ok(JSON(ProcedureSearchRes {
         results: find_results
     }))
 }

@@ -6,6 +6,7 @@ mod file_position;
 pub use self::preprocessor::{
     PreprocessorASTNode,
     PreprocessorAnalysisSection,
+    CodeBlockType,
     preprocessed_progress,
 };
 pub use self::file_position::{FilePosition};

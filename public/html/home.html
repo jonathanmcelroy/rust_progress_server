@@ -1,5 +1,11 @@
-<form ng-submit="home.onSearch()" name="search">
-    Search:
-    <input type="text" ng-model="home.searchText" required />
-    <input type="submit" id="submit" value="Submit" />
+<form ng-submit="home.onSearchProcedure()" name="searchProcedure">
+  Search Procedure:
+  <input type="text" ng-model="home.searchProcedureText" required />
+  <input type="submit" id="submit" value="Submit" />
+</form>
+<form ng-submit="home.onSearchInnerProcedure()" name="searchInnerProcedure">
+  Search Inner Procedure:
+  <input type="text" ng-model="home.innerSearchProcedureText" required />
+  <input type="text" ng-model="home.innerSearchInnerProcedureText" />
+  <input type="submit" id="submit" value="Submit" />
 </form>

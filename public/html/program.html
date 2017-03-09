@@ -5,6 +5,19 @@
     <li><a ui-sref="program({name: fileReference})">{{ fileReference }}</a></li>
 </ul>
 
-<pre><code>
-    {{ program.value }}
-</code></pre>
+<div ng-repeat="section in program.sections">
+  <div ng-switch="section.type" style="margin:10">
+    <div ng-switch-when="NotInSection">
+      <md-button ng-click="program.toggle(section)">
+        <md-icon>keyboard_arrow_down</md-icon>
+        <span>--- Not in section ---</span>
+      </md-button>
+      <div ng-if="section.open">
+        <pre><code>{{section.contents}}</code></pre>
+      </div>
+    </div>
+    <div ng-switch-default>
+      {{ section.type }} has no case
+    </div>
+  </div>
+</div>
