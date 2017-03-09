@@ -5,7 +5,6 @@
 #![plugin(rocket_codegen)]
 #![allow(dead_code)]
 
-#[macro_use] extern crate nom;
 #[macro_use] extern crate serde_derive;
 extern crate combine;
 extern crate docopt;
@@ -33,7 +32,7 @@ mod util;
 mod file_server_api;
 
 use error::{Error, ProgressResult, from};
-use parser::{PreprocessorAnalysisSection, preprocessed_progress, preprocessed_progress2, FilePosition};
+use parser::{PreprocessorAnalysisSection, preprocessed_progress, FilePosition};
 use util::u8_ref_to_string;
 use file_server_api::{get_procedure_contents, find_procedure};
 
@@ -76,7 +75,7 @@ fn static_html_index() -> ProgressResult<NamedFile> {
 }
 
 // Return the given program's contents
-#[get("/procedure/<procedure>", format="application/json")]
+#[get("/procedure/<procedure>")]
 fn get_procedure_route(procedure: String) -> ProgressResult<JSON<ProcedureRes>> {
     let file_contents = get_procedure_contents(&procedure)?;
 
@@ -107,7 +106,7 @@ fn find_inner_procedure_route(procedure: String, inner_procedure: String) -> Pro
 }
 
 // Find a procedure based upon the search query
-#[get("/search/procedure/<procedure>", rank = 2, format="application/json")]
+#[get("/search/procedure/<procedure>", rank = 2)]
 fn find_procedure_route(procedure: &str) -> ProgressResult<JSON<SearchRes>> {
     let find_results = find_procedure(procedure)?;
     Ok(JSON(SearchRes {
@@ -116,22 +115,11 @@ fn find_procedure_route(procedure: &str) -> ProgressResult<JSON<SearchRes>> {
 }
 
 // Return the given program's analysis sections
-#[get("/analysis_sections/<procedure>", format="application/json")]
+#[get("/analysis_sections/<procedure>")]
 fn get_analysis_sections_route(procedure: String) -> ProgressResult<JSON<AnalysisSectionsRes>> {
     let file_contents = get_procedure_contents(&procedure)?;
-
-    let parse = preprocessed_progress(&file_contents).to_full_result()?;
-    let sections = PreprocessorAnalysisSection::from(parse)?;
-    Ok(JSON(AnalysisSectionsRes {
-        sections: sections
-    }))
-}
-
-#[get("/analysis_sections_2/<procedure>", format="application/json")]
-fn get_analysis_sections_2_route(procedure: String) -> ProgressResult<JSON<AnalysisSectionsRes>> {
-    let file_contents = get_procedure_contents(&procedure)?;
-    let file_contents_ref: &[u8] = &file_contents;
-    let parse = from(preprocessed_progress2().parse_stream(file_contents_ref))?;
+    let file_contents_str: &str = &u8_ref_to_string(&file_contents);
+    let parse = from(preprocessed_progress().parse_stream(file_contents_str))?;
     let sections = PreprocessorAnalysisSection::from(parse)?;
     Ok(JSON(AnalysisSectionsRes {
         sections: sections
@@ -140,14 +128,13 @@ fn get_analysis_sections_2_route(procedure: String) -> ProgressResult<JSON<Analy
 
 fn main() {
     Rocket::ignite()
-        .mount("/api/", routes![
+        .mount("/", routes![static_html_handler, static_html_index])
+        .mount("/api", routes![
                get_procedure_route,
                find_procedure_route,
                find_inner_procedure_route,
                get_analysis_sections_route,
-               get_analysis_sections_2_route
         ])
-        .mount("/static/", routes![static_handler])
-        .mount("/", routes![static_html_handler, static_html_index])
+        .mount("/static", routes![static_handler])
         .launch();
 }

@@ -10,7 +10,6 @@ use hyper;
 use ini::ini;
 use serde_json;
 use url;
-use nom;
 use combine::primitives::{Consumed, ParseResult, ParseError, StreamOnce};
 
 #[derive(Debug)]
@@ -21,7 +20,6 @@ pub enum FromError {
     Docopt(docopt::Error),
     JSON(serde_json::Error),
     Url(url::ParseError),
-    Nom(nom::IError),
 }
 
 #[derive(Debug)]
@@ -65,9 +63,6 @@ impl From<serde_json::Error> for Error {
 impl From<url::ParseError> for Error {
     fn from(err: url::ParseError) -> Error { Error::FromError(FromError::Url(err)) }
 }
-impl From<nom::IError> for Error {
-    fn from(err: nom::IError) -> Error { Error::FromError(FromError::Nom(err)) }
-}
 
 impl Display for FromError {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
@@ -78,7 +73,6 @@ impl Display for FromError {
             &FromError::Docopt(ref err) => write!(f, "{}", err),
             &FromError::JSON(ref err) => write!(f, "{}", err),
             &FromError::Url(ref err) => write!(f, "{}", err),
-            &FromError::Nom(ref err) => write!(f, "{:?}", err),
         }
     }
 }
@@ -101,9 +95,7 @@ pub fn from<O, I>(parse_result: ParseResult<O, I>) -> Result<O, Error>
     parse_result.map(|(value, consumed)| value)
         .map_err(|consumed_err| {
             let errs = consumed_err.into_inner().errors;
-            // TODO: show all errors instead of just the first error
-            let ref err = errs[0];
-            Error::ParseError(format!("{:?}", err))
+            Error::ParseError(format!("{:?}", errs))
         })
 }
 

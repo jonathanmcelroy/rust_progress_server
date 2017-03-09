@@ -7,8 +7,6 @@ pub use self::preprocessor::{
     PreprocessorASTNode,
     PreprocessorAnalysisSection,
     preprocessed_progress,
-
-    preprocessed_progress2,
 };
 pub use self::file_position::{FilePosition};
 

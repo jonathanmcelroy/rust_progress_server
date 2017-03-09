@@ -1,14 +1,14 @@
 use std::ascii::AsciiExt;
 
-use combine::{choice, many1, tokens, value};
+use combine::{choice, many1, tokens, try, value};
 use combine::char::{spaces, string_cmp};
 use combine::primitives::{Parser, Stream};
 
-use parser::util::{identifier, identifier2, till_eol, till_eol2, wspace};
-use util::u8_ref_to_string;
 use parser::file_position::{FilePositionM, wrap};
+use parser::util::{identifier, till_eol};
+use util::u8_ref_to_string;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AnalysisSuspendHeader {
     VersionNumber,
     PreprocessorBlock,
@@ -20,7 +20,7 @@ pub enum AnalysisSuspendHeader {
 
 type AnalysisSuspendHeaderFP = FilePositionM<AnalysisSuspendHeader>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum CodeBlockType {
     Custom { name: String, frame_name: String },
     FunctionForward { name: String, frame_name: String },
@@ -32,229 +32,169 @@ pub enum CodeBlockType {
 
 type CodeBlockTypeFP = FilePositionM<CodeBlockType>;
 
-pub fn tag_no_case<I: Stream<Item=char>>(s: &'static str) -> impl Parser<Input=I> {
+fn tag_no_case<I: Stream<Item=char>>(s: &'static str) -> impl Parser<Input=I> {
     string_cmp(s, |l, r| l.eq_ignore_ascii_case(&r))
 }
 
-named!(custom_code_block<&[u8], CodeBlockType>,
-       do_parse!(
-           tag_no_case!("_CUSTOM") >>
-           wspace >>
-           name: identifier >>
-           wspace >>
-           frame_name: identifier >>
-           till_eol >>
-           (CodeBlockType::Custom {
-               name: u8_ref_to_string(name),
-               frame_name: u8_ref_to_string(frame_name) 
-           })
-           )
-      );
-
-pub fn custom_code_block2<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=CodeBlockType> {
+fn custom_code_block<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=CodeBlockType> {
     let name = tag_no_case("_CUSTOM")
         .with(spaces())
-        .with(identifier2());
+        .with(identifier());
     let frame_name = spaces()
-        .with(identifier2())
-        .skip(till_eol2());
+        .with(identifier());
     (name, frame_name).map(|(name, frame_name)| CodeBlockType::Custom { name, frame_name })
 }
 
 
-named!(function_forward<&[u8], CodeBlockType>,
-       do_parse!(
-           tag_no_case!("_FUNCTION-FORWARD") >>
-           wspace >>
-           name: identifier >>
-           wspace >>
-           frame_name: identifier >>
-           till_eol >>
-           (CodeBlockType::FunctionForward {
-               name: u8_ref_to_string(name),
-               frame_name: u8_ref_to_string(frame_name)
-           })
-           )
-      );
-named!(control_code_block<&[u8], CodeBlockType>,
-       do_parse!(
-           tag_no_case!("_CONTROL") >>
-           wspace >>
-           name: identifier >>
-           wspace >>
-           frame_name: identifier >>
-           till_eol >>
-           (CodeBlockType::Control {
-               name: u8_ref_to_string(name),
-               frame_name: u8_ref_to_string(frame_name)
-           })
-           )
-      );
-named!(procedure<&[u8], CodeBlockType>,
-       do_parse!(
-           tag_no_case!("_PROCEDURE") >>
-           wspace >>
-           name: identifier >>
-           wspace >>
-           frame_name: identifier >>
-           till_eol >>
-           (CodeBlockType::Procedure {
-               name: u8_ref_to_string(name),
-               frame_name: u8_ref_to_string(frame_name)
-           })
-           )
-      );
-named!(function<&[u8], CodeBlockType>,
-       do_parse!(
-           tag_no_case!("_FUNCTION") >>
-           wspace >>
-           name: identifier >>
-           wspace >>
-           frame_name: identifier >>
-           till_eol >>
-           (CodeBlockType::Function {
-               name: u8_ref_to_string(name),
-               frame_name: u8_ref_to_string(frame_name)
-           })
-           )
-      );
-named!(unknown_code_block<&[u8], CodeBlockType>,
-       do_parse!(
-           name: identifier >>
-           till_eol >>
-           (CodeBlockType::Unknown {
-               name: u8_ref_to_string(name)
-           })
-           )
-      );
-
-named!(block_type<&[u8], CodeBlockType>,
-       alt!(
-           custom_code_block |
-           function_forward |
-           control_code_block |
-           procedure |
-           function | 
-           unknown_code_block
-           )
-      );
-
-pub fn block_type2<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=CodeBlockType> {
-    // TODO: add the other choices
-    choice(vec![custom_code_block2()])
+fn function_forward<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=CodeBlockType> {
+    let name = tag_no_case("_FUNCTION-FORWARD")
+        .with(spaces())
+        .with(identifier());
+    let frame_name = spaces()
+        .with(identifier());
+    (name, frame_name).map(|(name, frame_name)| CodeBlockType::FunctionForward { name, frame_name })
 }
 
-named!(analyze_suspend_start, tag_no_case!("&analyze-suspend"));
+fn control_code_block<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=CodeBlockType> {
+    let name = tag_no_case("_CONTROL")
+        .with(spaces())
+        .with(identifier());
+    let frame_name = spaces()
+        .with(identifier());
+    (name, frame_name).map(|(name, frame_name)| CodeBlockType::Control { name, frame_name })
+}
 
-pub fn analyze_suspend_start2<I: Stream<Item=char>>() -> impl Parser<Input=I> {
+fn procedure<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=CodeBlockType> {
+    let name = tag_no_case("_PROCEDURE")
+        .with(spaces())
+        .with(identifier());
+    let frame_name = spaces()
+        .with(identifier());
+    (name, frame_name).map(|(name, frame_name)| CodeBlockType::Procedure { name, frame_name })
+}
+
+fn function<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=CodeBlockType> {
+    let name = tag_no_case("_FUNCTION")
+        .with(spaces())
+        .with(identifier());
+    let frame_name = spaces()
+        .with(identifier());
+    (name, frame_name).map(|(name, frame_name)| CodeBlockType::Function { name, frame_name })
+}
+
+fn unknown_code_block<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=CodeBlockType> {
+    identifier().map(|name| CodeBlockType::Unknown { name })
+}
+
+fn block_type<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=CodeBlockType> {
+    // TODO: add the other choices
+    try(custom_code_block())
+        .or(try(function_forward()))
+        .or(try(control_code_block()))
+        .or(try(procedure()))
+        .or(try(function()))
+        .or(unknown_code_block())
+}
+
+fn analyze_suspend_start<I: Stream<Item=char>>() -> impl Parser<Input=I> {
     tag_no_case("&analyze-suspend")
 }
 
-named!(analyze_suspend_version_numbers<&[u8], AnalysisSuspendHeader>,
-       value!(
-           AnalysisSuspendHeader::VersionNumber,
-           tuple!(
-               analyze_suspend_start,
-               wspace,
-               tag_no_case!("_VERSION-NUMBER"),
-               till_eol
-               )
-           )
-      );
-named!(analyze_suspend_preprocessor_block<&[u8], AnalysisSuspendHeader>,
-       value!(
-           AnalysisSuspendHeader::PreprocessorBlock,
-           tuple!(
-               analyze_suspend_start,
-               wspace,
-               tag_no_case!("_UIB-PREPROCESSOR-BLOCK"),
-               till_eol
-               )
-           )
-      );
-named!(analyze_suspend_procedure_settings<&[u8], AnalysisSuspendHeader>,
-       value!(
-           AnalysisSuspendHeader::ProcedureSettings,
-           tuple!(
-               analyze_suspend_start,
-               wspace,
-               tag_no_case!("_PROCEDURE-SETTINGS"),
-               till_eol
-               )
-           )
-      );
-named!(analyze_suspend_create_window<&[u8], AnalysisSuspendHeader>,
-       value!(
-           AnalysisSuspendHeader::CreateWindow,
-           tuple!(
-               analyze_suspend_start,
-               wspace,
-               tag_no_case!("_CREATE-WINDOW"),
-               till_eol
-               )
-           )
-      );
-named!(analyze_suspend_code_block<&[u8], AnalysisSuspendHeader>,
-       do_parse!(
-           analyze_suspend_start >>
-           wspace >>
-           tag_no_case!("_UIB-CODE-BLOCK") >>
-           wspace >>
-           block_type: block_type >>
-           till_eol >>
-           (AnalysisSuspendHeader::CodeBlock{ block_type })
-           )
-      );
+fn analyze_suspend_version_numbers<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=AnalysisSuspendHeader> {
+    value(AnalysisSuspendHeader::VersionNumber)
+        .skip((analyze_suspend_start(), spaces(), tag_no_case("_VERSION-NUMBER"), till_eol()))
+}
 
-pub fn analyze_suspend_code_block2<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=AnalysisSuspendHeader> {
-    analyze_suspend_start2()
+fn analyze_suspend_preprocessor_block<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=AnalysisSuspendHeader> {
+    value(AnalysisSuspendHeader::PreprocessorBlock)
+        .skip((analyze_suspend_start(), spaces(), tag_no_case("_UIB-PREPROCESSOR-BLOCK"), till_eol()))
+}
+
+fn analyze_suspend_procedure_settings<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=AnalysisSuspendHeader> {
+    value(AnalysisSuspendHeader::ProcedureSettings)
+        .skip((analyze_suspend_start(), spaces(), tag_no_case("_PROCEDURE-SETTINGS"), till_eol()))
+}
+
+fn analyze_suspend_create_window<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=AnalysisSuspendHeader> {
+    value(AnalysisSuspendHeader::CreateWindow)
+        .skip((analyze_suspend_start(), spaces(), tag_no_case("_CREATE-WINDOW"), till_eol()))
+}
+
+fn analyze_suspend_code_block<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=AnalysisSuspendHeader> {
+    analyze_suspend_start()
         .with(spaces())
         .with(tag_no_case("_UIB-CODE-BLOCK"))
         .with(spaces())
-        .with(block_type2())
-        .skip(till_eol2())
+        .with(block_type())
+        .skip(till_eol())
         .map(|block_type| AnalysisSuspendHeader::CodeBlock{ block_type })
 }
 
-named!(analyze_suspend_other<&[u8], AnalysisSuspendHeader>, 
-       do_parse!(
-           analyze_suspend_start >>
-           wspace >>
-           name: identifier >>
-           till_eol>>
-           (AnalysisSuspendHeader::Other { block_type: u8_ref_to_string(name) })
-           )
-      );
+fn analyze_suspend_other<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=AnalysisSuspendHeader> {
+    analyze_suspend_start()
+        .with(spaces())
+        .with(identifier())
+        .skip(till_eol())
+        .map(|block_type| AnalysisSuspendHeader::Other { block_type })
+}
 
-named!(pub analyze_suspend<&[u8], AnalysisSuspendHeader>,
-       alt_complete!(
-           analyze_suspend_version_numbers |
-           analyze_suspend_preprocessor_block |
-           analyze_suspend_procedure_settings |
-           analyze_suspend_create_window |
-           analyze_suspend_code_block |
-           analyze_suspend_other
-           )
-      );
-
-pub fn analysis_suspend2<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=AnalysisSuspendHeader> {
+pub fn analyze_suspend<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=AnalysisSuspendHeader> {
     // TODO: finish all options
-    let choices = vec![
-        // analyze_suspend_version_numbers2(),
-        // analyze_suspend_preprocessor_block2(),
-        // analyze_suspend_procedure_settings2(),
-        // analyze_suspend_create_window2(),
-        analyze_suspend_code_block2(),
-        // analyze_suspend_other2()
-    ];
-    choice(choices)
+    try(analyze_suspend_version_numbers())
+        .or(try(analyze_suspend_preprocessor_block()))
+        .or(try(analyze_suspend_procedure_settings()))
+        .or(try(analyze_suspend_create_window()))
+        .or(try(analyze_suspend_code_block()))
+        .or(analyze_suspend_other())
 }
 
 
-named!(pub analyze_resume,
-       do_parse!(
-           start: tag_no_case!("&analyze-resume") >>
-           till_eol >>
-           (start)
-           )
-      );
+pub fn analyze_resume<I: Stream<Item=char>>() -> impl Parser<Input=I> {
+    tag_no_case("&analyze-resume").skip(till_eol())
+}
+
+#[cfg(test)]
+mod tests {
+    use combine::Parser;
+
+    use error::from;
+
+    use super::{AnalysisSuspendHeader, CodeBlockType, analyze_suspend_code_block, custom_code_block};
+
+    #[test]
+    fn test_custom_code_block() {
+        let code = "_CUSTOM _DEFINITIONS fFrameWin";
+        let result = from(custom_code_block2().parse_stream(code));
+        if result.is_err() {
+            println!("Error: {:?}", result);
+            assert!(false);
+        }
+        let parse = result.unwrap();
+
+        let expected = CodeBlockType::Custom {
+            name: "_DEFINITIONS".to_string(),
+            frame_name: "fFrameWin".to_string(),
+        };
+        assert_eq!(expected, parse);
+    }
+
+    #[test]
+    fn analyze_suspend_custom_code_block() {
+
+        let code = "&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS fFrameWin\r\n";
+        let result = from(analyze_suspend_code_block2().parse_stream(code));
+        if result.is_err() {
+            println!("Error: {:?}", result);
+            assert!(false);
+        }
+        let parse = result.unwrap();
+
+        let expected = AnalysisSuspendHeader::CodeBlock { 
+            block_type: CodeBlockType::Custom {
+                name: "_DEFINITIONS".to_string(),
+                frame_name: "fFrameWin".to_string(),
+            }
+        };
+        assert_eq!(expected, parse);
+    }
+}

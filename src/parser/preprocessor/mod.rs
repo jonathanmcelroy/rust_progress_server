@@ -1,13 +1,16 @@
 mod analysis_suspend;
 
-use nom;
-use combine::{choice, many1, value};
+use std::fmt;
+use combine::{choice, many1, satisfy, try, value};
 use combine::combinator::{Value};
 use combine::primitives::{Parser, Stream};
+use combine::char::{char, digit};
 use self::analysis_suspend::{AnalysisSuspendHeader, CodeBlockType, analyze_suspend, analyze_resume};
+use util::{restrict_string};
+use parser::util::{till_eol};
 use error::{ProgressResult, Error};
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum PreprocessorASTNode {
     AnalysisSuspend(AnalysisSuspendHeader),
     AnalysisResume,
@@ -18,14 +21,28 @@ pub enum PreprocessorASTNode {
     Comment(String),
 }
 
+impl fmt::Debug for PreprocessorASTNode {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            &PreprocessorASTNode::AnalysisSuspend(ref analysis_suspend_header) => write!(f, "AnalysisSuspend({:?})", analysis_suspend_header),
+            &PreprocessorASTNode::AnalysisResume => write!(f, "AnalysisResume"),
+            &PreprocessorASTNode::PreprocessorLine(ref preprocessor_line) => write!(f, "PreprocessorLine({:?})", preprocessor_line),
+            &PreprocessorASTNode::Import(ref import) => write!(f, "Import({:?})", import),
+            &PreprocessorASTNode::Replace(ref replace) => write!(f, "Replace({:?})", replace),
+            &PreprocessorASTNode::Code(ref contents) => write!(f, "Code({:?})", restrict_string(contents)),
+            &PreprocessorASTNode::Comment(ref contents) => write!(f, "Comment({:?})", restrict_string(contents))
+        }
+    }
+}
+
 impl PreprocessorASTNode {
     fn get_contents(&self) -> Option<&str> {
         match self {
             &PreprocessorASTNode::AnalysisSuspend(_) => None,
             &PreprocessorASTNode::AnalysisResume => None,
-            &PreprocessorASTNode::PreprocessorLine(ref contents) => Some(contents),
-            &PreprocessorASTNode::Import(ref contents) => Some(contents),
-            &PreprocessorASTNode::Replace(ref contents) => Some(contents),
+            &PreprocessorASTNode::PreprocessorLine(_) => None,
+            &PreprocessorASTNode::Import(_) => None,
+            &PreprocessorASTNode::Replace(_) => None,
             &PreprocessorASTNode::Code(ref contents) => Some(contents),
             &PreprocessorASTNode::Comment(ref contents) => Some(contents)
         }
@@ -56,31 +73,51 @@ impl PreprocessorAnalysisSection {
     }
 
     pub fn from(nodes: Vec<PreprocessorASTNode>) -> ProgressResult<Vec<PreprocessorAnalysisSection>> {
+        let mut line_number = 0;
+
         let mut result = Vec::new();
         let mut section_start = None;
         let mut contents = String::new();
         for node in nodes {
+            println!("{}: {:?}", line_number, node);
             match node {
                 PreprocessorASTNode::AnalysisSuspend(header) => {
                     section_start = match section_start {
-                        Some(_) => return Err(Error::new("Two 'analysis-suspend's in a row")),
+                        Some(_) => return Err(Error::new(format!("Two 'analysis-suspend's in a row on line {}", line_number))),
                         None => Some(header)
                     };
+
+                    // Get the number of lines in the current section
+                    line_number += contents.chars().fold(0, |acc, c| if c == '\n' {acc+1} else {acc}) + 1;
+
                     if contents.trim().len() > 0 {
                         result.push(PreprocessorAnalysisSection::NotInSection{contents});
                     };
+
                     contents = String::new();
                 },
                 PreprocessorASTNode::AnalysisResume => {
                     section_start = match section_start {
                         Some(start) => {
+                            // Get the number of lines in the current section
+                            line_number += contents.chars().fold(0, |acc, c| if c == '\n' {acc+1} else {acc}) + 1;
+
                             result.push(PreprocessorAnalysisSection::new(start, contents));
                             None
                         },
-                        None => return Err(Error::new("A 'analysis-result' without an 'analysis-suspend'"))
+                        None => return Err(Error::new(format!("A 'analysis-resume' without an 'analysis-suspend' on line {}", line_number)))
                     };
+
                     contents = String::new();
-                }
+                },
+                PreprocessorASTNode::PreprocessorLine(line) => {
+                    contents.push_str(&line);
+                    contents.push_str("\r\n");
+                },
+                PreprocessorASTNode::Import(import) => {
+                    // TODO: this removes { and } from the import
+                    contents.push_str(&import);
+                },
                 node => {
                     let maybe_node_contents = node.get_contents();
                     if let Some(node_contents) = maybe_node_contents {
@@ -105,36 +142,32 @@ impl PreprocessorAnalysisSection {
     }
 }
 
-named!(preprocessor_line<&[u8], PreprocessorASTNode>,
-       do_parse!(
-           char!('&') >> 
-           line: take_until!("\n") >>
-           (PreprocessorASTNode::PreprocessorLine(String::from_utf8_lossy(line).into_owned()))
-           )
-      );
+fn preprocessor_line<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=PreprocessorASTNode> {
+    char('&')
+        .with(till_eol())
+        .map(PreprocessorASTNode::PreprocessorLine)
+}
 
-named!(preprocessor_import<&[u8], PreprocessorASTNode>,
-       do_parse!(
-           char!('{') >>
-           import: take_until!("}") >>
-           char!('}') >>
-           (PreprocessorASTNode::Import(String::from_utf8_lossy(import).into_owned()))
-           )
-      );
+fn preprocessor_import<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=PreprocessorASTNode> {
+    char('{')
+        .with(many1(satisfy(|c| c != '}')))
+        .skip(char('}'))
+        .map(PreprocessorASTNode::Import)
+}
 
-named!(preprocessor_replace<&[u8], PreprocessorASTNode>,
-       do_parse!(
-           char!('{') >>
-           d: call!(nom::digit) >>
-           char!('}') >>
-           (PreprocessorASTNode::Replace(String::from_utf8_lossy(d).into_owned()))
-           )
-      );
+fn preprocessor_replace<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=PreprocessorASTNode> {
+    char('{')
+        .with(many1(digit()))
+        .skip(char('}'))
+        .map(PreprocessorASTNode::Replace)
+}
 
-named!(code<&[u8], PreprocessorASTNode>, map!(take_until_either!("{&"), |b| PreprocessorASTNode::Code(String::from_utf8_lossy(b).into_owned())));
+fn code<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=PreprocessorASTNode> {
+    many1(satisfy(|c| c != '{' && c != '&')).map(PreprocessorASTNode::Code)
+}
 
 /*
-// TODO: add this back
+// TODO: add comments back
 named!(pub comment<&[u8], PreprocessorASTNode>,
 do_parse!(
 tag!("/*") >>
@@ -150,26 +183,13 @@ tag!("*/") >>
 );
 */
 
-named!(pub preprocessed_progress<&[u8], Vec<PreprocessorASTNode> >,
-       many1!(
-           alt_complete!(
-               map!(analyze_suspend, PreprocessorASTNode::AnalysisSuspend) |
-               value!(PreprocessorASTNode::AnalysisResume, analyze_resume) |
-               preprocessor_line |
-               preprocessor_replace |
-               preprocessor_import |
-               // comment |
-               code
-               )
-           )
-      );
-
-pub fn preprocessed_progress2<I: Stream>() -> impl Parser<Input=I, Output=Vec<PreprocessorASTNode>> {
-    // TODO: complete
-    //return many1(
-        //choice(
-            //analyze_suspend,
-              //)
-        //);
-    return value(vec![]);
+pub fn preprocessed_progress<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=Vec<PreprocessorASTNode>> {
+    let choices = try(analyze_suspend().map(PreprocessorASTNode::AnalysisSuspend))
+        .or(try(value(PreprocessorASTNode::AnalysisResume).skip(analyze_resume())))
+        .or(try(preprocessor_line()))
+        .or(try(preprocessor_replace()))
+        .or(try(preprocessor_import()))
+        // .or(comment())
+        .or(code());
+    many1(choices)
 }
