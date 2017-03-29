@@ -3,6 +3,9 @@ mod preprocessor;
 mod util;
 mod file_position;
 
+use combine::{skip_many, any, choice, many1, token, try, value, satisfy};
+use combine::primitives::{Parser, Stream};
+
 pub use self::preprocessor::{
     PreprocessorASTNode,
     PreprocessorAnalysisSection,
@@ -11,45 +14,41 @@ pub use self::preprocessor::{
 };
 pub use self::file_position::{FilePosition};
 
-/*
-#[derive(Debug)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Progress {
+    statements: Vec<Statement>
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Statement {
     Generic(String),
 }
-*/
 
-/*
-named!(parse_statement<Statement>,
-);
-*/
-
-/*
-named!(parse_progress<Vec<Statement> >,
-    many1!(parse_statement)
-);
-*/
-
-/*
-pub fn parse(contents: &str) -> Result<Vec<Statement>, String> {
-    let preprocessed_contents_vec = preprocessed_progress(contents.as_bytes());
-    if preprocessed_contents_vec.is_done() {
-        let result = preprocessed_contents_vec.unwrap().1;
-        let preprocessed_contents = result.into_iter().fold(String::new(), |mut accum, value| {
-            match value {
-                PreprocessorAST::Code(ref a) => accum.push_str(a),
-                PreprocessorAST::Comment(ref a) => accum.push_str(a),
-                _ => {}
-                // PreprocessorAST::PreprocessorLine(a) => _,
-                // PreprocessorAST::Import(String),
-                // PreprocessorAST::Replace(String),
+pub fn ignore<I: Stream<Item=PreprocessorASTNode>>() -> impl Parser<Input=I, Output=PreprocessorASTNode> {
+    satisfy(|node| 
+            match node {
+                PreprocessorASTNode::AnalysisSuspend(_) => true,
+                PreprocessorASTNode::AnalysisResume => true,
+                PreprocessorASTNode::PreprocessorLine(_) => true, // TODO: this may define code, so don't ignore it
+                PreprocessorASTNode::Import(_) => true, // TODO: this definately defines code, so don't ignoe it
+                PreprocessorASTNode::Replace(_) => true, // TODO: this may define code, so don't ignoe it
+                PreprocessorASTNode::Code(_) => false,
+                PreprocessorASTNode::Comment(_) => true,
             }
-            return accum;
-        });
-        return Result::Ok(vec!(Statement::Generic(preprocessed_contents)));
-    } else {
-        println!("Not done");
-    }
-
-    return Result::Err(String::from("Testing"));
+           )
 }
-*/
+
+pub fn statement<I: Stream<Item=PreprocessorASTNode>>() -> impl Parser<Input=I, Output=Statement> {
+    skip_many(ignore()).with(any()).map(|node| 
+                                   match node {
+                                       PreprocessorASTNode::Code(code) => Statement::Generic(code),
+                                       expr => unreachable!("This should not have code: {:?}", expr)
+                                   }
+                                  )
+}
+
+pub fn progress<I: Stream<Item=PreprocessorASTNode>>() -> impl Parser<Input=I, Output=Progress> {
+    many1(statement()).map(|statements| Progress {
+        statements
+    })
+}

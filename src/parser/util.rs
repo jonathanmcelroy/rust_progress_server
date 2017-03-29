@@ -1,5 +1,7 @@
+use std::ascii::AsciiExt;
+
 use combine::{many, many1, satisfy, choice};
-use combine::char::{char, letter, alpha_num, crlf, newline, string};
+use combine::char::{char, letter, alpha_num, crlf, newline, string, string_cmp};
 use combine::primitives::{Parser, Stream};
 
 // type Parser<O> = combine::Parser<Input: &[u8], Output: O>;
@@ -23,3 +25,8 @@ pub fn identifier<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=String>
         result
     })
 }
+
+pub fn tag_no_case<I: Stream<Item=char>>(s: &'static str) -> impl Parser<Input=I> {
+    string_cmp(s, |l, r| l.eq_ignore_ascii_case(&r))
+}
+

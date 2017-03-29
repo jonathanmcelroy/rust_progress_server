@@ -1,11 +1,9 @@
-use std::ascii::AsciiExt;
-
 use combine::{choice, many1, tokens, try, value};
-use combine::char::{spaces, string_cmp};
+use combine::char::{spaces};
 use combine::primitives::{Parser, Stream};
 
 use parser::file_position::{FilePositionM, wrap};
-use parser::util::{identifier, till_eol};
+use parser::util::{identifier, till_eol, tag_no_case};
 use util::u8_ref_to_string;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,6 +19,7 @@ pub enum AnalysisSuspendHeader {
 type AnalysisSuspendHeaderFP = FilePositionM<AnalysisSuspendHeader>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum CodeBlockType {
     Custom { name: String, frame_name: String },
     FunctionForward { name: String, frame_name: String },
@@ -31,10 +30,6 @@ pub enum CodeBlockType {
 }
 
 type CodeBlockTypeFP = FilePositionM<CodeBlockType>;
-
-fn tag_no_case<I: Stream<Item=char>>(s: &'static str) -> impl Parser<Input=I> {
-    string_cmp(s, |l, r| l.eq_ignore_ascii_case(&r))
-}
 
 fn custom_code_block<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=CodeBlockType> {
     let name = tag_no_case("_CUSTOM")

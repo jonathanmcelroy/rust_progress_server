@@ -3,9 +3,10 @@
     var programController = this;
     programController.value = "Loading program...";
     programController.sections = []
+    programController.createWindowSection;
 
     programController.toggle = section => {
-      console.log("Called");
+      console.log(section);
       section.open = !section.open;
     }
 
@@ -15,6 +16,11 @@
       programController.sections = res.sections.map(section => {
         section.open = false;
         return section;
+      });
+      programController.sections.forEach(section => {
+        if (section.type == "CreateWindow") {
+          programController.createWindowSection = section
+        }
       });
     }).$promise.catch(function(a) {
       programController.sections = "Could not fetch program";

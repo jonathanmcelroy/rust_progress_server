@@ -1,6 +1,12 @@
 
 <h3> {{ program.name }} </h3>
 
+<hr>
+
+<code>{{ program.createWindowSection }}</code>
+
+<hr>
+
 <ul ng-repeat="fileReference in program.fileReferences track by $index">
     <li><a ui-sref="program({name: fileReference})">{{ fileReference }}</a></li>
 </ul>
@@ -14,6 +20,43 @@
       </md-button>
       <div ng-if="section.open">
         <pre><code>{{section.contents}}</code></pre>
+      </div>
+    </div>
+    <div ng-switch-when="VersionNumber"><!-- Version is not important to me --></div>
+    <div ng-switch-when="CodeBlock">
+      <md-button ng-click="program.toggle(section)">
+        <md-icon>keyboard_arrow_down</md-icon>
+        <div ng-switch="section.block_type.type" style="display:inline">
+          <span ng-switch-when="Custom">Custom Code Block</span>
+          <span ng-switch-when="FunctionForward">Function Forward</span>
+          <span ng-switch-when="Control">Event Block for '{{ section.block_type.name }}'<!-- TODO: show more attributes --></span>
+          <span ng-switch-when="Procedure">Procedure '{{ section.block_type.name }}'</span>
+          <span ng-switch-when="Function">Function '{{ section.block_type.name }}'</span>
+          <span ng-switch-default>Unknown Code Block '{{ section.block_type.type }}'</span>
+        </div>
+      </md-button>
+      <div ng-if="section.open">
+        <pre><code>{{ section.contents }}</code></pre>
+      </div>
+    </div>
+    <div ng-switch-when="PreprocessorBlock">
+      <md-button ng-click="program.toggle(section)">
+        <md-icon>keyboard_arrow_down</md-icon>
+        <span>Preprocessor Section</span>
+      </md-button>
+      <div ng-if="section.open">
+        <pre><code>{{ section.contents }}</code></pre>
+      </div>
+    </div>
+    <div ng-switch-when="ProcedureSettings"><!-- I don't need to see this --></div>
+    <div ng-switch-when="CreateWindow"><!-- I don't need to see this --></div>
+    <div ng-switch-when="Other">
+      <md-button ng-click="program.toggle(section)">
+        <md-icon>keyboard_arrow_down</md-icon>
+        <span>Other Section</span>
+      </md-button>
+      <div ng-if="section.open">
+        <pre><code>{{ section.contents }}</code></pre>
       </div>
     </div>
     <div ng-switch-default>

@@ -24,6 +24,7 @@ use rocket::Rocket;
 use rocket::response::NamedFile;
 use rocket_contrib::JSON;
 use combine::Parser;
+use combine::primitives::from_iter;
 
 
 mod error;
@@ -32,7 +33,14 @@ mod util;
 mod file_server_api;
 
 use error::{Error, ProgressResult, from};
-use parser::{PreprocessorAnalysisSection, CodeBlockType, preprocessed_progress, FilePosition};
+use parser::{
+    CodeBlockType,
+    FilePosition,
+    PreprocessorAnalysisSection,
+    Progress,
+    preprocessed_progress,
+    progress,
+};
 use util::u8_ref_to_string;
 use file_server_api::{get_procedure_contents, find_procedure};
 
@@ -41,6 +49,10 @@ struct ProcedureRes {
     pub sections: Vec<PreprocessorAnalysisSection>,
     // pub contents: String,
     pub file_references: Vec<String>,
+}
+#[derive(Serialize, Deserialize)]
+struct ProcedureParseRes {
+    pub parse: Progress
 }
 #[derive(Serialize, Deserialize)]
 struct InnerProcedureRes {
@@ -95,6 +107,20 @@ fn get_procedure_route(procedure: String) -> ProgressResult<JSON<ProcedureRes>> 
     }))
 }
 
+#[get("/procedure_parse/<procedure>")]
+fn get_procedure_parse_route(procedure: String) -> ProgressResult<JSON<ProcedureParseRes>> {
+    let file_contents = get_procedure_contents(&procedure)?;
+    let file_contents_str: &str = &u8_ref_to_string(&file_contents);
+    let preprocessor_parse = from(preprocessed_progress().parse_stream(file_contents_str))?;
+    println!("{:?}", preprocessor_parse.len());
+    let parse = from(progress().parse_stream(from_iter(preprocessor_parse.into_iter())))?;
+    println!("{:?}", parse);
+
+    Ok(JSON(ProcedureParseRes {
+        parse
+    }))
+}
+
 #[get("/search/procedure/<procedure>/<inner_procedure>")]
 fn find_inner_procedure_route(procedure: String, inner_procedure: String) -> ProgressResult<JSON<InnerProcedureSearchRes>> {
     let find_procedures = find_procedure(&procedure)?;
@@ -146,6 +172,7 @@ fn main() {
         .mount("/", routes![static_html_handler, static_html_index])
         .mount("/api", routes![
                get_procedure_route,
+               get_procedure_parse_route,
                find_procedure_route,
                find_inner_procedure_route,
                get_analysis_sections_route,
