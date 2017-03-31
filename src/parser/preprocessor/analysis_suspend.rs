@@ -159,7 +159,7 @@ mod tests {
     #[test]
     fn test_custom_code_block() {
         let code = "_CUSTOM _DEFINITIONS fFrameWin";
-        let result = from(custom_code_block2().parse_stream(code));
+        let result = from(custom_code_block().parse_stream(code));
         if result.is_err() {
             println!("Error: {:?}", result);
             assert!(false);
@@ -177,7 +177,7 @@ mod tests {
     fn analyze_suspend_custom_code_block() {
 
         let code = "&ANALYZE-SUSPEND _UIB-CODE-BLOCK _CUSTOM _DEFINITIONS fFrameWin\r\n";
-        let result = from(analyze_suspend_code_block2().parse_stream(code));
+        let result = from(analyze_suspend_code_block().parse_stream(code));
         if result.is_err() {
             println!("Error: {:?}", result);
             assert!(false);

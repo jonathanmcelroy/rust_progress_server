@@ -112,9 +112,7 @@ fn get_procedure_parse_route(procedure: String) -> ProgressResult<JSON<Procedure
     let file_contents = get_procedure_contents(&procedure)?;
     let file_contents_str: &str = &u8_ref_to_string(&file_contents);
     let preprocessor_parse = from(preprocessed_progress().parse_stream(file_contents_str))?;
-    println!("{:?}", preprocessor_parse.len());
     let parse = from(progress().parse_stream(from_iter(preprocessor_parse.into_iter())))?;
-    println!("{:?}", parse);
 
     Ok(JSON(ProcedureParseRes {
         parse
