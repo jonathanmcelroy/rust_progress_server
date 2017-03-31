@@ -7,7 +7,7 @@ use combine::primitives::{Parser, Stream, ParseResult};
 use combine::char::{char, digit, string, spaces};
 use util::{restrict_string};
 use parser::util::{identifier, till_eol, tag_no_case};
-use error::{ProgressResult, Error};
+use error::{from, ProgressResult, Error};
 
 use self::analysis_suspend::{AnalysisSuspendHeader, analyze_suspend, analyze_resume};
 pub use self::analysis_suspend::{
@@ -66,20 +66,20 @@ pub enum PreprocessorAnalysisSection {
 }
 
 impl PreprocessorAnalysisSection {
-    fn new(header: AnalysisSuspendHeader, contents: String) -> PreprocessorAnalysisSection {
+    fn create(header: AnalysisSuspendHeader, contents: String) -> ProgressResult<PreprocessorAnalysisSection> {
         match header {
-            AnalysisSuspendHeader::VersionNumber => PreprocessorAnalysisSection::VersionNumber,
-            AnalysisSuspendHeader::PreprocessorBlock => PreprocessorAnalysisSection::PreprocessorBlock{contents},
-            AnalysisSuspendHeader::ProcedureSettings => PreprocessorAnalysisSection::ProcedureSettings{contents},
+            AnalysisSuspendHeader::VersionNumber => Ok(PreprocessorAnalysisSection::VersionNumber),
+            AnalysisSuspendHeader::PreprocessorBlock => Ok(PreprocessorAnalysisSection::PreprocessorBlock{contents}),
+            AnalysisSuspendHeader::ProcedureSettings => Ok(PreprocessorAnalysisSection::ProcedureSettings{contents}),
             AnalysisSuspendHeader::CreateWindow => {
                 let attributes = {
-                    let contents_str: &str = &contents;
-                    create_window().parse_stream(contents_str).unwrap().0
+                    let str_contents: &str = &contents;
+                    from(create_window().parse_stream(str_contents))?
                 };
-                PreprocessorAnalysisSection::CreateWindow{contents, attributes}
+                Ok(PreprocessorAnalysisSection::CreateWindow{contents, attributes})
             },
-            AnalysisSuspendHeader::CodeBlock { block_type } => PreprocessorAnalysisSection::CodeBlock{block_type, contents},
-            AnalysisSuspendHeader::Other { block_type } => PreprocessorAnalysisSection::Other{block_type, contents}
+            AnalysisSuspendHeader::CodeBlock { block_type } => Ok(PreprocessorAnalysisSection::CodeBlock{block_type, contents}),
+            AnalysisSuspendHeader::Other { block_type } => Ok(PreprocessorAnalysisSection::Other{block_type, contents})
         }
     }
 
@@ -90,7 +90,7 @@ impl PreprocessorAnalysisSection {
         let mut section_start = None;
         let mut contents = String::new();
         for node in nodes {
-            println!("{}: {:?}", line_number, node);
+            // println!("{}: {:?}", line_number, node);
             match node {
                 PreprocessorASTNode::AnalysisSuspend(header) => {
                     section_start = match section_start {
@@ -113,7 +113,7 @@ impl PreprocessorAnalysisSection {
                             // Get the number of lines in the current section
                             line_number += contents.chars().fold(0, |acc, c| if c == '\n' {acc+1} else {acc}) + 1;
 
-                            result.push(PreprocessorAnalysisSection::new(start, contents));
+                            result.push(PreprocessorAnalysisSection::create(start, contents)?);
                             None
                         },
                         None => return Err(Error::new(format!("A 'analysis-resume' without an 'analysis-suspend' on line {}", line_number)))
@@ -182,6 +182,7 @@ fn create_window<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=Vec<(Str
         }
         acc / 10.0
     }
+
     let number = (many1(digit()), optional(char('.').with(many1(digit())))).map(|(intStr, mFrac): (String, _)| {
         let int: f32 = intStr.parse().unwrap();
         match mFrac {
@@ -192,7 +193,7 @@ fn create_window<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=Vec<(Str
     });
     let assign = (identifier(), spaces().with(char('=')).with(spaces()).with(number));
 
-    return start.with(many1(assign)).skip((spaces(), char('.')));
+    return start.with(many1(assign.skip(spaces()))).skip(char('.'));
 }
 
 fn preprocessor_line<I: Stream<Item=char>>() -> impl Parser<Input=I, Output=PreprocessorASTNode> {
@@ -263,7 +264,24 @@ pub fn preprocessed_progress<I: Stream<Item=char>>() -> impl Parser<Input=I, Out
 
 #[cfg(test)]
 mod tests {
+    use combine::Parser;
+
+    use error::from;
+
+    use super::{ spaces, tag_no_case, till_eol, identifier, many1, digit, optional, char};
+    use super::{ create_window };
+
     #[test]
     fn test_create_window() {
+        let input_string = "/* DESIGN Window definition (used by the UIB)\n  CREATE WINDOW fFrameWni ASSIGN\n         HEIGHT             = 25\n         WIDTH              = 123.2.\n   END WINDOW DEFINITION\n*/";
+
+        let result = from(create_window().parse_stream(input_string));
+        if result.is_err() {
+            println!("Error: {:?}", result);
+            assert!(false);
+        }
+        let parse = result.unwrap();
+        let expected = vec![("HEIGHT".to_string(), 25.0), ("WIDTH".to_string(), 123.2)];
+        assert_eq!(expected, parse);
     }
 }
